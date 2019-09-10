@@ -9,7 +9,18 @@ from __future__ import absolute_import
 # the Free Software Foundation; either version 2 of the License, or
 # (at your option) any later version.
 #---------------------------------------------------------------------
-from qgis.PyQt.QtWidgets import QWidget, QLineEdit, QTextEdit, QVBoxLayout, QMessageBox, QSplitter, QApplication, QLabel
+from qgis.PyQt.QtWidgets import (
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QPushButton,
+    QSplitter,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget
+)
 from future import standard_library
 standard_library.install_aliases()
 from builtins import str
@@ -66,6 +77,8 @@ class ConsoleWidget(QWidget):
         self.console_out.setReadOnly(True)
         self.console_out.setFont(QFont("Courier"))
         self.console_out.setVisible(False)  # initially hidden
+        self.cmds_hist = []
+        self.cmds_idx = 0
 
         self.console_outs = ['']*len(self.entries)
 
@@ -73,9 +86,30 @@ class ConsoleWidget(QWidget):
 
         l = QVBoxLayout()
         l.addWidget(self.console_out)
-        l.addWidget(self.console)
+        hl = QHBoxLayout()
+        hl.addWidget(self.console)
+
+        # command history buttons
+        self.prev_cmd_btn = QPushButton('Prev')
+        self.next_cmd_btn = QPushButton('Next')
+        hl.addWidget(self.prev_cmd_btn)
+        hl.addWidget(self.next_cmd_btn)
+        l.addLayout(hl)
+        self.prev_cmd_btn.clicked.connect(self.show_prev_cmd)
+        self.next_cmd_btn.clicked.connect(self.show_next_cmd)
+
         l.setContentsMargins(0,0,0,0)
         self.setLayout(l)
+
+    def show_prev_cmd(self):
+        if self.cmds_idx > 0:
+            self.cmds_idx -= 1
+            self.console.setText(self.cmds_hist[self.cmds_idx])
+
+    def show_next_cmd(self):
+        if self.cmds_idx < len(self.cmds_hist) - 1:
+            self.cmds_idx += 1
+            self.console.setText(self.cmds_hist[self.cmds_idx])
 
     def go_to_frame(self, index):
         self.console_out.setPlainText(self.console_outs[index])
@@ -98,6 +132,9 @@ class ConsoleWidget(QWidget):
         #print frame_vars[1]
 
         line = self.console.text()
+        self.cmds_hist.append(line)
+        self.cmds_idx = len(self.cmds_hist) - 1
+
         try:
             c = self.compiler(line, "<console>", "single")
         except (OverflowError, SyntaxError, ValueError) as e:

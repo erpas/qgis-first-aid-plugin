@@ -106,7 +106,7 @@ class ObjectTreeItem(VariablesTreeItem):
 
     def populate_children(self):
         self.populated_children = True
-        for i,v in list(self.value.__dict__.items()):
+        for i,v in list(sorted(self.value.__dict__.items())):
             make_item(str(i), v, self)
 
         if self.custom_handler is not None:
