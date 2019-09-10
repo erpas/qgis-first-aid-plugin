@@ -59,6 +59,19 @@ def stdout_redirected(new_stdout):
         sys.stdout = save_stdout
 
 
+class ConsoleEdit(QLineEdit):
+
+    show_prev_sig = pyqtSignal()
+    show_next_sig = pyqtSignal()
+
+    def keyPressEvent(self, e):
+        super(ConsoleEdit, self).keyPressEvent(e)
+        if e.key() == Qt.Key_Up:
+            self.show_prev_sig.emit()
+        elif e.key() == Qt.Key_Down:
+            self.show_next_sig.emit()
+
+
 class ConsoleWidget(QWidget):
     def __init__(self, exc_info, parent=None):
         QWidget.__init__(self, parent)
@@ -68,9 +81,11 @@ class ConsoleWidget(QWidget):
         self.tb = exc_info[2]
         self.entries = traceback.extract_tb(self.tb)
 
-        self.console = QLineEdit()
+        self.console = ConsoleEdit()
         self.console.setPlaceholderText(">>> Python Console")
         self.console.returnPressed.connect(self.exec_console)
+        self.console.show_prev_sig.connect(self.show_prev_cmd)
+        self.console.show_next_sig.connect(self.show_next_cmd)
         self.console.setFont(QFont("Courier"))
 
         self.console_out = QTextEdit()
@@ -91,12 +106,15 @@ class ConsoleWidget(QWidget):
 
         # command history buttons
         self.prev_cmd_btn = QPushButton('Prev')
+        self.prev_cmd_btn.setToolTip('Show previous command, Arrow Up')
         self.next_cmd_btn = QPushButton('Next')
+        self.next_cmd_btn.setToolTip('Show next command, Arrow Down')
         hl.addWidget(self.prev_cmd_btn)
         hl.addWidget(self.next_cmd_btn)
         l.addLayout(hl)
         self.prev_cmd_btn.clicked.connect(self.show_prev_cmd)
         self.next_cmd_btn.clicked.connect(self.show_next_cmd)
+        self.update_btns()
 
         l.setContentsMargins(0,0,0,0)
         self.setLayout(l)
@@ -105,11 +123,17 @@ class ConsoleWidget(QWidget):
         if self.cmds_idx > 0:
             self.cmds_idx -= 1
             self.console.setText(self.cmds_hist[self.cmds_idx])
+        self.update_btns()
 
     def show_next_cmd(self):
         if self.cmds_idx < len(self.cmds_hist) - 1:
             self.cmds_idx += 1
             self.console.setText(self.cmds_hist[self.cmds_idx])
+        self.update_btns()
+
+    def update_btns(self):
+        self.prev_cmd_btn.setEnabled(self.cmds_idx > 0)
+        self.next_cmd_btn.setEnabled(len(self.cmds_hist) and self.cmds_idx < len(self.cmds_hist) - 1)
 
     def go_to_frame(self, index):
         self.console_out.setPlainText(self.console_outs[index])
@@ -132,8 +156,13 @@ class ConsoleWidget(QWidget):
         #print frame_vars[1]
 
         line = self.console.text()
-        self.cmds_hist.append(line)
-        self.cmds_idx = len(self.cmds_hist) - 1
+        if not self.cmds_hist:
+            self.cmds_hist.append(line)
+        else:
+            if line != self.cmds_hist[-1]:
+                self.cmds_hist.append(line)
+        self.cmds_idx = len(self.cmds_hist)
+        self.update_btns()
 
         try:
             c = self.compiler(line, "<console>", "single")
